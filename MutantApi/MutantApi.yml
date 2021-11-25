@@ -7,14 +7,6 @@ Parameters:
   DeployEnvironment:
     Type: "String"
     AllowedValues: ["Production", "Labs"]
-  SubnetPrivate:
-    Type: "CommaDelimitedList"
-  CommonDataAccessSecurityGroupId:
-    Type: "CommaDelimitedList"
-  HostRedis:
-    Type: "String"
-  PortRedis:
-    Type: "Number"
   DynamoDbTableDna:
     Type: "String"
   DynamoDbTableStat:
@@ -27,26 +19,26 @@ Globals:
 Mappings:
   Labs:
     S3:
-      BucketCloudFormation: xmens-cloudformation-architecture
+      BucketCloudFormation: xmen-cloudformation-architecture
     DnaLambda:
-      BucketCloudFormation: xmens-cloudformation-architecture
+      BucketCloudFormation: xmen-cloudformation-architecture
       BucketKeyCloudFormation: dna/code/dna.zip
       Timeout: 5
     StatLambda:
-      BucketCloudFormation: xmens-cloudformation-architecture
+      BucketCloudFormation: xmen-cloudformation-architecture
       BucketKeyCloudFormation: stat/code/stat.zip
       Timeout: 5
       AgregationKey: "aggregation"
 
   Production:
     S3:
-      BucketCloudFormation: xmens-cloudformation-architecture-prd
+      BucketCloudFormation: xmen-cloudformation-architecture-prd
     DnaLambda:
-      BucketCloudFormation: xmens-cloudformation-architecture-prd
+      BucketCloudFormation: xmen-cloudformation-architecture-prd
       BucketKeyCloudFormation: dna/code/dna.zip
       Timeout: 5
     StatLambda:
-      BucketCloudFormation: xmens-cloudformation-architecture-prd
+      BucketCloudFormation: xmen-cloudformation-architecture-prd
       BucketKeyCloudFormation: stat/code/stat.zip
       Timeout: 5
       AgregationKey: "aggregation"
@@ -137,13 +129,8 @@ Resources:
       Timeout: !FindInMap [!Ref DeployEnvironment, DnaLambda, Timeout]
       Environment:
         Variables:
-          HOST_REDIS: !Ref HostRedis
-          PORT_REDIS: !Ref PortRedis
           DYNAMO_TABLE_DNA: !Ref DynamoDbTableDna
           TOPIC_ARN: !Ref MutantTopic
-      VpcConfig:
-        SecurityGroupIds: !Ref CommonDataAccessSecurityGroupId
-        SubnetIds: !Ref SubnetPrivate
       Tags:
         Stage: !Ref DeployEnvironment
         Name: DnaLambda
@@ -161,7 +148,6 @@ Resources:
             Action:
               - "sts:AssumeRole"
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
         - arn:aws:iam::aws:policy/AmazonSNSFullAccess
         - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
       RoleName: "dna-lambda-role"
