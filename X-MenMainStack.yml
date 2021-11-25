@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "This stack it represents all platform components for this project"
+Parameters:
+  DeployEnvironment:
+    Type: String
+    AllowedValues: [Production, Labs]
+    
+Mappings:
+  Labs:
+    S3:
+      BucketCloudFormation: xmen-cloudformation-architecture
+    MutantApi:
+      Stage: v1
+    Dynamodb:
+      TableDnaName: dna
+      TableStatName: stat
+  Production:
+    S3:
+      BucketCloudFormation: xmen-cloudformation-architecture-prd
+    MutantApi:
+      Stage: v1
+    Dynamodb:
+      TableDnaName: dna
+      TableStatName: stat
+
+Resources:
+
+  MutantApiStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub
+        - https://${BucketCloudFormation}.s3.amazonaws.com/MutantApi/MutantApi.yml
+        - {
+            BucketCloudFormation:
+              !FindInMap [!Ref DeployEnvironment, S3, BucketCloudFormation],
+          }
+      Parameters:
+        DeployEnvironment: !Ref DeployEnvironment
+        DynamoDbTableDna:
+          !FindInMap [!Ref DeployEnvironment, Dynamodb, TableDnaName]
+        DynamoDbTableStat:
+          !FindInMap [!Ref DeployEnvironment, Dynamodb, TableStatName]
+
+  DynamodbStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub
+        - https://${BucketCloudFormation}.s3.amazonaws.com/Dynamodb/Dynamodb.yml
+        - {
+            BucketCloudFormation:
+              !FindInMap [!Ref DeployEnvironment, S3, BucketCloudFormation],
+          }
+      Parameters:
+        DeployEnvironment: !Ref DeployEnvironment
+        DynamoDbTableDna:
+          !FindInMap [!Ref DeployEnvironment, Dynamodb, TableDnaName]
+        DynamoDbTableStat:
+          !FindInMap [!Ref DeployEnvironment, Dynamodb, TableStatName]
