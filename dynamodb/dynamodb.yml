@@ -1,0 +1,37 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  client-configuration
+
+Parameters:
+  DeployEnvironment:
+    Type: "String"
+    AllowedValues: ["Production", "Labs"]
+  DynamoDbTableDna:
+    Type: "String"
+  DynamoDbTableStat:
+    Type: "String"
+
+Resources:
+  DnaTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref DynamoDbTableDna
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: idDna
+          KeyType: HASH
+      AttributeDefinitions:
+        - AttributeName: idDna
+          AttributeType: S
+  StatTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref DynamoDbTableStat
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: aggregation
+          KeyType: HASH
+      AttributeDefinitions:
+        - AttributeName: aggregation
+          AttributeType: S

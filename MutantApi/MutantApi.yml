@@ -1,0 +1,168 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  mutant-api
+
+Parameters:
+  DeployEnvironment:
+    Type: "String"
+    AllowedValues: ["Production", "Labs"]
+  SubnetPrivate:
+    Type: "CommaDelimitedList"
+  CommonDataAccessSecurityGroupId:
+    Type: "CommaDelimitedList"
+  HostRedis:
+    Type: "String"
+  PortRedis:
+    Type: "Number"
+  DynamoDbTableDna:
+    Type: "String"
+  DynamoDbTableStat:
+    Type: "String"
+
+Globals:
+  Api:
+    OpenApiVersion: 3.0.1
+
+Mappings:
+  Labs:
+    S3:
+      BucketCloudFormation: xmens-cloudformation-architecture
+    DnaLambda:
+      BucketCloudFormation: xmens-cloudformation-architecture
+      BucketKeyCloudFormation: dna/code/dna.zip
+      Timeout: 5
+    StatLambda:
+      BucketCloudFormation: xmens-cloudformation-architecture
+      BucketKeyCloudFormation: stat/code/stat.zip
+      Timeout: 5
+      AgregationKey: "aggregation"
+
+  Production:
+    S3:
+      BucketCloudFormation: xmens-cloudformation-architecture-prd
+    DnaLambda:
+      BucketCloudFormation: xmens-cloudformation-architecture-prd
+      BucketKeyCloudFormation: dna/code/dna.zip
+      Timeout: 5
+    StatLambda:
+      BucketCloudFormation: xmens-cloudformation-architecture-prd
+      BucketKeyCloudFormation: stat/code/stat.zip
+      Timeout: 5
+      AgregationKey: "aggregation"
+
+
+Resources:
+  MutantApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: "v1"
+      Name: MutantApi
+      Cors:
+        AllowHeaders: "'Authorization,Content-Type,X-Api-Key'"
+        AllowOrigin: "'*'"
+
+  MutantTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: "Mutant"
+      TopicName: "Mutant"
+
+  StatLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: StatLambda
+      Events:
+        Api1:
+          Type: Api
+          Properties:
+            Path: /stat
+            Method: get
+            RestApiId:
+              Ref: MutantApi
+        SNSEvent:
+          Type: SNS
+          Properties:
+            Topic: !Ref MutantTopic
+      CodeUri:
+        Bucket: !FindInMap [!Ref DeployEnvironment, StatLambda, BucketCloudFormation]
+        Key:  !FindInMap [!Ref DeployEnvironment, StatLambda, BucketKeyCloudFormation]
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.8
+      Role: !GetAtt StatLambdasRole.Arn
+      Timeout: !FindInMap [!Ref DeployEnvironment, StatLambda, Timeout]
+      Environment:
+        Variables:
+          DYNAMO_TABLE: !Ref DynamoDbTableStat
+          AGGREGATION_KEY: !FindInMap [!Ref DeployEnvironment, StatLambda, AgregationKey]
+      Tags:
+        Stage: !Ref DeployEnvironment
+        Name: StatLambda
+        Author: johnibanezt@gmail.com
+  StatLambdasRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+      RoleName: "stat-lambda-role"
+
+  DnaLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: DnaLambda
+      Events:
+        Api1:
+          Type: Api
+          Properties:
+            Path: /mutant
+            Method: post
+            RestApiId:
+              Ref: MutantApi
+      CodeUri:
+        Bucket: !FindInMap [!Ref DeployEnvironment, DnaLambda, BucketCloudFormation]
+        Key:  !FindInMap [!Ref DeployEnvironment, DnaLambda, BucketKeyCloudFormation]
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.8
+      Role: !GetAtt DnaLambdasRole.Arn
+      Timeout: !FindInMap [!Ref DeployEnvironment, DnaLambda, Timeout]
+      Environment:
+        Variables:
+          HOST_REDIS: !Ref HostRedis
+          PORT_REDIS: !Ref PortRedis
+          DYNAMO_TABLE_DNA: !Ref DynamoDbTableDna
+          TOPIC_ARN: !Ref MutantTopic
+      VpcConfig:
+        SecurityGroupIds: !Ref CommonDataAccessSecurityGroupId
+        SubnetIds: !Ref SubnetPrivate
+      Tags:
+        Stage: !Ref DeployEnvironment
+        Name: DnaLambda
+        Author: johnibanezt@gmail.com
+  DnaLambdasRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+      RoleName: "dna-lambda-role"
+
